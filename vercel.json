@@ -2,7 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/search.js": {
-      "_comment": "2048 is the Hobby-plan ceiling; higher is rejected at deploy time with invalid_function_memory. The search route needs the headroom because it loads the fp16 CLIP text tower on a cold container.",
       "memory": 2048,
       "maxDuration": 60
     },

@@ -107,3 +107,19 @@ query change rather than a migration.
 
 Vercel Hobby caps at 12 serverless functions per deployment. Phase 1 uses 4.
 Worth knowing before it becomes a deploy error.
+
+## Deployment notes (learned the hard way)
+
+- **`vercel.json` rejects unknown keys.** No `_comment` fields — the deploy
+  fails with `should NOT have additional property`. Config commentary belongs
+  here instead.
+- **Hobby plan caps function memory at 2048 MB.** Anything higher is rejected at
+  deploy time with `invalid_function_memory`. `api/search.js` sits at the
+  ceiling because a cold container loads the fp16 CLIP text tower.
+- **New Vercel projects default to SSO deployment protection ON**
+  (`ssoProtection: {"deploymentType": "all_except_custom_domains"}`), which puts
+  a login wall in front of every `.vercel.app` URL. This project is a public
+  archive with no auth wall by design, so it is disabled deliberately.
+- **`rootDirectory` must match where the app lives.** It is correctly `null`
+  here because the app is at the repo root; on a subfolder app, leaving it null
+  makes deploys report READY in seconds having built nothing at all.
