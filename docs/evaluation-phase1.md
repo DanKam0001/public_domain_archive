@@ -1,7 +1,31 @@
 # Phase 1 search quality evaluation
 
-**Date:** 2026-09-07 · **Corpus:** 1,038 items · **Model:** `openai/clip-vit-base-patch32`
+**Date:** 2026-09-08 · **Corpus:** 966 items · **Model:** `openai/clip-vit-base-patch32`
 **Reproduce:** `python -m ingest.evaluate`
+
+> **Re-run on an unbiased corpus.** The original evaluation below was measured on
+> an alphabetically clustered sample (see "Alphabetical sampling bias"). That
+> sampler is fixed and the corpus was rebuilt from scratch. Headline numbers on
+> the fair draw:
+>
+> | | Biased corpus (1,038) | Fair corpus (966) |
+> |---|---|---|
+> | Mean spread over median | +0.113 | **+0.119** |
+> | Weakest query | +0.062 | +0.048 |
+> | Flat result sets | 0/20 | **0/20** |
+> | Redundant duplicates | 28% | **4%** |
+>
+> **The verdict survives a fair sample, and slightly improves.** That was not the
+> expected result — the old sample's heavy museum-and-manuscript skew looked like
+> it should have flattered CLIP. It did not: the fair corpus separates queries
+> marginally better across the board, while the weakest query gets slightly
+> weaker.
+>
+> Retrieval on individual queries shifted with the content, as it should.
+> "a cat" improved (+0.076 → +0.083) and now returns animal studies and a
+> spectacled bear rather than Persian miniatures of lions. "a busy city street at
+> night" fell (+0.110 → +0.085) and its top five are one near-identical cluster —
+> which the API suppresses at query time but this harness does not (see Method).
 
 This was the Phase 1 go/no-go gate: is CLIP retrieval good enough on *public
 domain* material to be worth building an API, a frontend, and an SDK on top of?
@@ -161,6 +185,13 @@ precision. It reports:
   ranking is close to arbitrary.
 * **the actual titles**, printed, because at this corpus size human judgement is
   the only real ground truth.
+
+**This harness queries the table directly, not through `search_items`.** So it
+measures *raw* retrieval and does not benefit from the duplicate suppression the
+API applies — which is why a near-identical cluster can occupy a whole result
+list here while the live API would not show it. That is deliberate: measuring
+the retrieval layer and the presentation layer separately keeps a regression in
+one from being masked by the other.
 
 The query set deliberately mixes easy concrete nouns, scenes, people, archival
 subjects, and abstract prompts. A set of only easy queries would have flattered
