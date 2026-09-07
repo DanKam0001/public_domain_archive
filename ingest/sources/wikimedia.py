@@ -83,7 +83,14 @@ class WikimediaSource(Source):
         yielded = 0
 
         for category in self.categories:
-            continue_token: str | None = None
+            # MediaWiki's continuation is a dict, not a single token, and which
+            # keys it contains varies. When `prop=imageinfo` cannot fit every
+            # page's data into one response it continues with `iistart` rather
+            # than `gcmcontinue` — so reading only `gcmcontinue` makes a large
+            # category look exhausted after one page. (It did: a 700-item
+            # harvest stopped at 75.) The documented contract is to echo the
+            # whole `continue` object back, so that is what we do.
+            continuation: dict[str, str] = {}
 
             while yielded < limit:
                 params = {
@@ -92,15 +99,14 @@ class WikimediaSource(Source):
                     "generator": "categorymembers",
                     "gcmtitle": category,
                     "gcmtype": "file",
-                    "gcmlimit": min(BATCH, limit - yielded + 50),
+                    "gcmlimit": BATCH,
                     "prop": "imageinfo",
                     "iiprop": "url|size|mime|extmetadata",
                     # Ask for a scaled rendition alongside the original; the
                     # response then carries `thumburl`. See RENDITION_WIDTH.
                     "iiurlwidth": RENDITION_WIDTH,
                 }
-                if continue_token:
-                    params["gcmcontinue"] = continue_token
+                params.update(continuation)
 
                 try:
                     payload = self._get(API, params=params)
@@ -120,9 +126,9 @@ class WikimediaSource(Source):
                     if yielded >= limit:
                         return
 
-                continue_token = (payload.get("continue") or {}).get("gcmcontinue")
-                if not continue_token:
-                    break  # category exhausted; move to the next one
+                continuation = payload.get("continue") or {}
+                if not continuation:
+                    break  # category genuinely exhausted; move to the next one
 
     def _to_raw_item(self, page: dict) -> RawItem | None:
         info_list = page.get("imageinfo") or []
