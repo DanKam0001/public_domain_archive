@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import os
 import statistics
+import sys
 
 import psycopg
 from dotenv import load_dotenv
@@ -66,6 +67,12 @@ FLAT_THRESHOLD = 0.04
 
 
 def main() -> int:
+    # Titles come from archives worldwide and contain arbitrary Unicode.
+    # Windows consoles default to cp1252, which raises UnicodeEncodeError
+    # partway through a run — losing the results printed so far.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
 
     from .pipeline.embed import Embedder
