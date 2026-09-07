@@ -1,22 +1,23 @@
 """Ingestion CLI.
 
-    python -m ingest.run --source wikimedia_commons --limit 50 --dry-run
+    python -m ingest.run --source wikimedia_commons --limit 500
+    python -m ingest.run --source openverse --limit 200 --dry-run
 
-``--dry-run`` harvests and runs the licence gate but writes nothing. It is the
-honest way to see what a source actually offers before committing storage to it,
-and it prints the rejection reasons in full — a source whose items are mostly
-rejected is information, not a failure.
+``--dry-run`` harvests and gates but downloads, embeds, and stores nothing. It
+is the honest way to see what a source actually offers before spending
+bandwidth on it, and it needs no credentials.
 
-Storage (R2 upload, embedding, database write) lands in the next step; until
-then this runs dry regardless of the flag.
+A real run needs ``.env`` (see ``.env.example``). Credentials are write-scoped
+and never leave this machine.
 """
 
 from __future__ import annotations
 
 import argparse
-import collections
 import os
 import sys
+
+from dotenv import load_dotenv
 
 from .licensing.gate import DEFAULT_ACCEPTED_TIERS, LicenseGate
 from .sources import SOURCES
@@ -32,69 +33,35 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source", required=True, choices=sorted(SOURCES))
     parser.add_argument("--limit", type=int, default=50)
     parser.add_argument("--dry-run", action="store_true",
-                        help="harvest and gate, but write nothing")
+                        help="harvest and gate only; no download, embed, or write")
     parser.add_argument("--tiers", default=",".join(sorted(DEFAULT_ACCEPTED_TIERS)),
-                        help="comma-separated licence tiers to accept "
-                             "(public_domain, attribution)")
-    parser.add_argument("--show-rejects", type=int, default=5,
-                        help="print this many example rejections per reason")
+                        help="licence tiers to accept: public_domain, attribution")
+    parser.add_argument("--batch-size", type=int, default=16)
     args = parser.parse_args(argv)
 
-    user_agent = os.environ.get("INGEST_USER_AGENT", DEFAULT_UA)
+    load_dotenv()
+
+    # Imported after load_dotenv so the pinned model id is read from .env.
+    from .pipeline.runner import report, run
+
     gate = LicenseGate(accepted_tiers=set(args.tiers.split(",")))
-    source = SOURCES[args.source](user_agent=user_agent)
+    source = SOURCES[args.source](
+        user_agent=os.environ.get("INGEST_USER_AGENT", DEFAULT_UA)
+    )
 
-    print(f"harvesting up to {args.limit} from {args.source}")
-    print(f"accepting tiers: {sorted(gate._accepted_tiers)}\n")
+    print(f"source        : {args.source}")
+    print(f"limit         : {args.limit}")
+    print(f"accepted tiers: {sorted(gate._accepted_tiers)}")
+    print(f"mode          : {'DRY RUN (no writes)' if args.dry_run else 'live'}\n")
 
-    admitted = 0
-    reasons: collections.Counter[str] = collections.Counter()
-    examples: dict[str, list[str]] = collections.defaultdict(list)
-    licences: collections.Counter[str] = collections.Counter()
-
-    for item in source.harvest(args.limit):
-        decision = gate.evaluate(
-            license_url=item.license_url,
-            license_text=item.license_text,
-            explicit_license_id=item.explicit_license_id,
-            raw=item.raw,
-        )
-
-        if decision.allowed:
-            admitted += 1
-            licences[decision.license_id] += 1
-        else:
-            key = decision.reason.split(":")[0] + ": " + decision.reason.split(": ", 1)[-1]
-            reasons[key] += 1
-            if len(examples[key]) < args.show_rejects:
-                examples[key].append(f"{item.source_id} — {(item.title or '')[:60]}")
-
-    total = admitted + sum(reasons.values())
-    print(f"\n{'=' * 62}")
-    print(f"harvested : {total}")
-    print(f"admitted  : {admitted}"
-          + (f"  ({admitted / total:.0%})" if total else ""))
-    print(f"rejected  : {total - admitted}")
-
-    if licences:
-        print("\nadmitted by licence:")
-        for lic, count in licences.most_common():
-            print(f"  {count:5d}  {lic}")
-
-    if reasons:
-        print("\nrejected by reason:")
-        for reason, count in reasons.most_common():
-            print(f"  {count:5d}  {reason}")
-            for example in examples[reason]:
-                print(f"           e.g. {example}")
+    stats = run(source, gate, args.limit, dry_run=args.dry_run,
+                batch_size=args.batch_size)
+    report(stats)
 
     skipped = getattr(source, "skipped_restricted", 0)
     if skipped:
         print(f"\nalso skipped before gating: {skipped} item(s) flagged with "
               f"non-copyright restrictions (trademark / personality rights)")
-
-    if not args.dry_run:
-        print("\n[!] storage not implemented yet — this run wrote nothing.")
 
     return 0
 
