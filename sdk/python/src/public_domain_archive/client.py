@@ -62,12 +62,25 @@ class Client:
 
     # -- search -------------------------------------------------------------
 
-    def search(self, query: str, *, limit: int = 24, tier: str | None = None) -> list[Item]:
+    def search(self, query: str, *, limit: int = 24, tier: str | None = None,
+               expand: bool = False) -> list[Item]:
         """Search by natural-language description.
 
         ``tier`` filters by licence obligation: ``"public_domain"`` returns only
         items with no conditions on reuse, which is what you want when the
         output is monetised and nobody will be checking credits.
+
+        ``expand`` rewrites abstract phrasing into concrete visual descriptions
+        before searching. **Use it for narration lines**, which is what makes it
+        matter: CLIP matches literal visual content and cannot match emotion or
+        metaphor, so "the passage of time" retrieves almost nothing useful on its
+        own. Measured on the real corpus, expansion raised that query's
+        separation from +0.039 to +0.187, and every abstract query tested
+        improved.
+
+        It is off by default because it costs a model call server-side. Turn it
+        on when the query is a phrase a person would *say* rather than a
+        description of a picture.
         """
         if not query or not query.strip():
             raise RequestError("query must not be empty")
@@ -75,6 +88,8 @@ class Client:
         payload: dict[str, Any] = {"query": query.strip(), "limit": limit}
         if tier:
             payload["tier"] = tier
+        if expand:
+            payload["expand"] = True
 
         data = self._request("POST", "/api/search", body=payload)
         return [Item.from_json(row) for row in data.get("results", [])]
@@ -127,14 +142,17 @@ class Client:
         return dest
 
     def search_and_download(
-        self, query: str, dest: str | Path, *, limit: int = 10, tier: str | None = None,
+        self, query: str, dest: str | Path, *, limit: int = 10,
+        tier: str | None = None, expand: bool = False,
     ) -> list[tuple[Item, Path]]:
         """Search, download every result, and write a credits file.
 
         The shape Phase 3's ``auto_broll(script)`` will build on: one call from
-        a description to files on disk that are safe to use.
+        a description to files on disk that are safe to use. That feature will
+        pass ``expand=True``, because it is fed narration rather than image
+        descriptions — see :meth:`search`.
         """
-        items = self.search(query, limit=limit, tier=tier)
+        items = self.search(query, limit=limit, tier=tier, expand=expand)
         dest = Path(dest)
         pairs = [(item, self.download(item, dest)) for item in items]
         self.write_credits([item for item, _ in pairs], dest / "CREDITS.txt")

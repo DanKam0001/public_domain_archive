@@ -9,6 +9,7 @@
 
 import { embedText, toVectorLiteral, MODEL_ID } from './_lib/embed.mjs';
 import { searchItems } from './_lib/db.mjs';
+import { expandQuery, expansionAvailable } from './_lib/expand.mjs';
 import { cached, cors, fail, json, presentItem, rateLimit } from './_lib/http.mjs';
 
 const MAX_LIMIT = 100;
@@ -34,6 +35,9 @@ export default async function handler(req, res) {
 
   const limit = clamp(parseInt(body.limit, 10) || 24, 1, MAX_LIMIT);
   const tier = body.tier ?? null;
+  // Off by default: expansion costs a model call (~$0.005). Callers feeding
+  // narration lines want it; a casual web search does not. See _lib/expand.mjs.
+  const expand = body.expand === true;
   if (tier !== null && !VALID_TIERS.has(tier)) {
     return fail(res, 400, `tier must be one of: ${[...VALID_TIERS].join(', ')}`);
   }
@@ -47,12 +51,24 @@ export default async function handler(req, res) {
       async () => toVectorLiteral((await embedText([query]))[0]),
     );
 
-    const rows = await searchItems({ embedding, limit, tier });
+    let rows = await searchItems({ embedding, limit, tier });
+    let variants = [];
+
+    if (expand && expansionAvailable()) {
+      variants = await expandQuery(query);
+      if (variants.length) {
+        rows = await searchExpanded({ query, embedding, variants, limit, tier });
+      }
+    }
 
     return json(res, 200, {
       query,
       count: rows.length,
       results: rows.map((row) => presentItem(row)),
+      // Returned so a caller can see what was actually searched. Expansion
+      // changes the results materially; hiding it would make them
+      // inexplicable.
+      expanded: variants.length ? variants : undefined,
       // Stated per response rather than assumed: a caller comparing results
       // over time needs to know if the embedding model changed underneath them.
       model: MODEL_ID,
@@ -61,6 +77,36 @@ export default async function handler(req, res) {
     console.error('search failed:', error);
     return fail(res, 500, 'search failed');
   }
+}
+
+/**
+ * Search the original query plus every rewrite, and keep each item's BEST score.
+ *
+ * Max-similarity rather than rank fusion, deliberately. Reciprocal rank fusion
+ * rewards items that place moderately well across many variants, which for five
+ * descriptions of the same idea surfaces bland middle-ranking images. Taking the
+ * maximum keeps the item that one variant matched *strongly* — the whole point
+ * of generating varied concrete scenes — and keeps `similarity` meaning the same
+ * thing it does on an unexpanded search.
+ */
+async function searchExpanded({ query, embedding, variants, limit, tier }) {
+  const embeddings = await embedText(variants);
+  const searches = [
+    searchItems({ embedding, limit, tier }),
+    ...embeddings.map((vector) =>
+      searchItems({ embedding: toVectorLiteral(vector), limit, tier })),
+  ];
+
+  const best = new Map();
+  for (const rows of await Promise.all(searches)) {
+    for (const row of rows) {
+      const existing = best.get(row.id);
+      if (!existing || row.similarity > existing.similarity) best.set(row.id, row);
+    }
+  }
+  return [...best.values()]
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, limit);
 }
 
 function clamp(value, low, high) {

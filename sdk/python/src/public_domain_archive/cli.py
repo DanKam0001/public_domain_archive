@@ -44,6 +44,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     search.add_argument("-d", "--download", metavar="DIR",
                         help="download results here and write CREDITS.txt")
+    search.add_argument("-x", "--expand", action="store_true",
+                        help="rewrite abstract phrasing into concrete visual "
+                             "descriptions first -- use for narration lines")
 
     get = sub.add_parser("get", help="full metadata for one item")
     get.add_argument("item_id")
@@ -75,6 +78,7 @@ def _search(client: Client, args) -> int:
     if args.download:
         pairs = client.search_and_download(
             args.query, args.download, limit=args.limit, tier=args.tier,
+            expand=args.expand,
         )
         if args.json:
             print(json.dumps(
@@ -86,7 +90,8 @@ def _search(client: Client, args) -> int:
             print(f"credits written to {args.download}/CREDITS.txt")
         return 0
 
-    return _emit(client.search(args.query, limit=args.limit, tier=args.tier), args.json)
+    return _emit(client.search(args.query, limit=args.limit, tier=args.tier,
+                               expand=args.expand), args.json)
 
 
 def _emit(items: list[Item], as_json: bool, detailed: bool = False) -> int:

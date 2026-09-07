@@ -6,6 +6,7 @@
   "description": "Free, open, programmable search over public domain media",
   "license": "AGPL-3.0-or-later",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
     "@huggingface/transformers": "^3.0.0",
     "postgres": "^3.4.4"
   }
