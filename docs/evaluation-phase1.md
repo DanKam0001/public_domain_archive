@@ -104,6 +104,51 @@ night" returned Sydney Harbour Bridge. There are no cats and no night streets in
 thing that exists. At this corpus size, a bad result usually means "nothing
 relevant was ingested," not "retrieval is broken."
 
+## Both problems above were subsequently fixed
+
+### Sampling bias — fixed by prefix sharding
+
+Three traversal strategies were measured against the live API:
+
+| Strategy | Result |
+|---|---|
+| `generator=random` | Uniform, but cannot combine with a category filter — most results carry licences the gate rejects, so the requests are wasted |
+| `gcmsort=timestamp` | Category membership is lumpy in time; most shards landed in sparse stretches. ~1.3 new items per shard, and a 200-item request returned 121 |
+| **`gcmstartsortkeyprefix`** | **Chosen.** 20 shards returned 1,000 items with zero empty shards |
+
+Prefix sharding also attacks the bias directly, because each prefix bucket
+contributes equally regardless of how many items sit under it — so one bulk
+upload owning the front of the alphabet stops mattering.
+
+| Measured over 200 items | Sequential | Sharded |
+|---|---|---|
+| Top title initial | 180 (90%) | 20 (10%) |
+| Distinct initials | 6 | 20 |
+| Top creator | 35 (17%) | 10 (5%) |
+| Redundant duplicates | 22% | 0% |
+
+### Abstract queries — fixed by opt-in query expansion
+
+Rewriting abstract phrasing into concrete photographable scenes before
+embedding (`api/_lib/expand.mjs`):
+
+| Query | Before | After |
+|---|---|---|
+| the passage of time | +0.039 | **+0.187** |
+| a sense of freedom | +0.055 | **+0.151** |
+| something lonely | +0.067 | **+0.160** |
+| two people talking | +0.088 | **+0.156** |
+| a feeling of celebration | +0.062 | **+0.102** |
+
+Mean gain +0.089, every query improved, and expanded results now score *above*
+the concrete-query average of +0.113 — the weakest category becomes among the
+strongest.
+
+Opt-in rather than automatic: measured at ~$0.005 per expansion, which at a
+thousand searches a day would be ~$144/month against a $25 total bill. It is
+cached indefinitely, separately rate-limited, and degrades to unexpanded results
+when unavailable.
+
 ## Method and its limits
 
 There is no labelled ground truth, so this deliberately does not claim recall or
