@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Public Domain Archive — free, verified public domain media</title>
+<meta name="description" content="Search public domain images. Every item licence-verified per item, free to download, no account required.">
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --surface: #ffffff;
+    --ink: #16150f;
+    --muted: #6b6659;
+    --line: #e4e0d8;
+    --accent: #1c5d4a;
+    --accent-ink: #ffffff;
+    --ok: #1c5d4a;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.06);
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14140f;
+      --surface: #1d1d17;
+      --ink: #f0ede4;
+      --muted: #a09a8c;
+      --line: #33322a;
+      --accent: #6bbfa2;
+      --accent-ink: #12211c;
+      --ok: #6bbfa2;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  header {
+    border-bottom: 1px solid var(--line);
+    padding: 28px 20px 24px;
+    background: var(--surface);
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 {
+    margin: 0 0 6px; font-size: 1.45rem; letter-spacing: -.02em;
+    font-weight: 640;
+  }
+  .tagline { margin: 0 0 20px; color: var(--muted); font-size: .95rem; max-width: 62ch; }
+  .tagline strong { color: var(--ink); font-weight: 600; }
+
+  form { display: flex; gap: 8px; flex-wrap: wrap; }
+  input[type=search] {
+    flex: 1 1 340px; min-width: 0;
+    padding: 12px 14px; font-size: 1rem; font-family: inherit;
+    color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  input[type=search]:focus-visible, button:focus-visible, .chip:focus-visible,
+  .card:focus-visible, .close:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  button {
+    padding: 12px 20px; font-size: 1rem; font-family: inherit; font-weight: 560;
+    color: var(--accent-ink); background: var(--accent);
+    border: 0; border-radius: var(--radius); cursor: pointer;
+  }
+  button:disabled { opacity: .55; cursor: progress; }
+
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .chip {
+    font-size: .82rem; padding: 5px 11px; border-radius: 999px;
+    border: 1px solid var(--line); background: transparent; color: var(--muted);
+    cursor: pointer; font-family: inherit;
+  }
+  .chip:hover { color: var(--ink); border-color: var(--muted); }
+
+  main { padding: 24px 20px 64px; }
+  .status { color: var(--muted); font-size: .9rem; margin: 0 0 18px; min-height: 1.4em; }
+  .status .slow { display: block; margin-top: 4px; font-size: .85rem; }
+
+  .grid {
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  }
+  .card {
+    display: flex; flex-direction: column; text-align: left;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); overflow: hidden; cursor: pointer;
+    padding: 0; font: inherit; color: inherit;
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .card img {
+    width: 100%; aspect-ratio: 4 / 3; object-fit: cover;
+    background: var(--line); display: block;
+  }
+  .card .meta { padding: 10px 12px 12px; }
+  .card .t {
+    font-size: .88rem; font-weight: 560; line-height: 1.35;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .card .l { margin-top: 6px; font-size: .74rem; color: var(--muted); }
+  .badge {
+    display: inline-block; padding: 1px 7px; border-radius: 999px;
+    border: 1px solid var(--line); font-size: .7rem; color: var(--ok);
+    font-weight: 600; letter-spacing: .01em;
+  }
+
+  /* detail dialog */
+  dialog {
+    border: 1px solid var(--line); border-radius: 14px; padding: 0;
+    background: var(--surface); color: var(--ink);
+    max-width: 940px; width: calc(100% - 32px); box-shadow: var(--shadow);
+  }
+  dialog::backdrop { background: rgba(0,0,0,.55); }
+  .detail { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(0,1fr); }
+  @media (max-width: 720px) { .detail { grid-template-columns: 1fr; } }
+  .detail img { width: 100%; max-height: 62vh; object-fit: contain; background: var(--bg); }
+  .info { padding: 20px 22px 22px; overflow-y: auto; max-height: 62vh; }
+  .info h2 { margin: 0 0 4px; font-size: 1.05rem; line-height: 1.35; }
+  .info .by { color: var(--muted); font-size: .88rem; margin: 0 0 16px; }
+  .info dl { margin: 0 0 16px; font-size: .85rem; }
+  .info dt { color: var(--muted); margin-top: 10px; font-size: .78rem;
+             text-transform: uppercase; letter-spacing: .05em; }
+  .info dd { margin: 2px 0 0; word-break: break-word; }
+  .licence-note {
+    font-size: .8rem; color: var(--muted); border-left: 2px solid var(--line);
+    padding-left: 10px; margin: 14px 0;
+  }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .actions a {
+    text-decoration: none; padding: 9px 14px; border-radius: var(--radius);
+    font-size: .88rem; font-weight: 560;
+  }
+  .primary { background: var(--accent); color: var(--accent-ink); }
+  .secondary { border: 1px solid var(--line); color: var(--ink); }
+  .close {
+    position: absolute; top: 10px; right: 12px; background: var(--surface);
+    color: var(--ink); border: 1px solid var(--line); border-radius: 999px;
+    width: 32px; height: 32px; font-size: 1.1rem; line-height: 1; padding: 0;
+  }
+  footer {
+    border-top: 1px solid var(--line); padding: 22px 20px 40px;
+    color: var(--muted); font-size: .84rem;
+  }
+  footer p { margin: 0 0 8px; max-width: 74ch; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>Public Domain Archive</h1>
+    <p class="tagline">
+      Search media that is genuinely in the public domain. Every item is
+      <strong>licence-verified individually</strong> before it enters the catalog —
+      anything missing, ambiguous, or restrictive is excluded. Free to download,
+      no account, no watermark.
+    </p>
+    <form id="form" role="search">
+      <input id="q" type="search" placeholder="Describe what you're looking for — e.g. snow covered mountains"
+             aria-label="Search the archive" autocomplete="off" spellcheck="false">
+      <button id="go" type="submit">Search</button>
+    </form>
+    <div class="chips" id="chips" role="group" aria-label="Example searches"></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="status" id="status" role="status" aria-live="polite"></p>
+  <div class="grid" id="grid"></div>
+</main>
+
+<footer class="wrap">
+  <p>
+    We are an index pointing at each source's licence claim — not a warrantor of it.
+    Every item links back to its original source so you can verify independently.
+    Public domain status is jurisdiction-specific; our determinations are US-based.
+  </p>
+  <p>
+    Spotted something that shouldn't be here?
+    <a href="https://github.com/DanKam0001/public_domain_archive/issues/new?title=Licensing%20problem">Report a licensing problem</a>
+    · <a href="https://github.com/DanKam0001/public_domain_archive">Source code (AGPL-3.0)</a>
+    · <a href="https://github.com/DanKam0001/public_domain_archive/blob/main/docs/licensing-policy.md">Licensing policy</a>
+  </p>
+</footer>
+
+<dialog id="detail"><button class="close" id="close" aria-label="Close">×</button><div id="detailBody"></div></dialog>
+
+<script type="module">
+const EXAMPLES = [
+  'snow covered mountains', 'an antique map', 'a steam locomotive',
+  'a black and white photograph of a factory', 'waves crashing on rocks',
+  'a handwritten manuscript page', 'a red flower',
+];
+
+const $ = (id) => document.getElementById(id);
+const grid = $('grid'), status = $('status'), dialog = $('detail');
+let inFlight = null;
+
+// Example chips double as the empty state: an archive with a blank page gives a
+// visitor no idea what it holds or how to phrase a query for it.
+for (const example of EXAMPLES) {
+  const chip = document.createElement('button');
+  chip.type = 'button';
+  chip.className = 'chip';
+  chip.textContent = example;
+  chip.onclick = () => { $('q').value = example; search(example); };
+  $('chips').append(chip);
+}
+
+$('form').onsubmit = (event) => {
+  event.preventDefault();
+  search($('q').value.trim());
+};
+
+$('close').onclick = () => dialog.close();
+dialog.addEventListener('click', (event) => {
+  // Click on the backdrop (the dialog element itself, not its contents).
+  if (event.target === dialog) dialog.close();
+});
+
+async function search(query) {
+  if (!query) return;
+  if (inFlight) inFlight.abort();
+  inFlight = new AbortController();
+
+  $('go').disabled = true;
+  grid.setAttribute('aria-busy', 'true');
+  status.textContent = `Searching for “${query}”…`;
+
+  // The first query after an idle period pays a cold start while the model
+  // loads. Saying so beats a silent spinner that looks broken.
+  const slowTimer = setTimeout(() => {
+    status.innerHTML = `Searching for “${escapeHtml(query)}”…` +
+      `<span class="slow">Waking the search model — the first query after a quiet spell takes a few seconds.</span>`;
+  }, 2500);
+
+  try {
+    const response = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, limit: 36 }),
+      signal: inFlight.signal,
+    });
+    if (!response.ok) throw new Error(`search failed (${response.status})`);
+    const data = await response.json();
+    render(data, query);
+  } catch (error) {
+    if (error.name === 'AbortError') return;
+    status.textContent = `Something went wrong: ${error.message}. Try again in a moment.`;
+    grid.replaceChildren();
+  } finally {
+    clearTimeout(slowTimer);
+    $('go').disabled = false;
+    grid.removeAttribute('aria-busy');
+    inFlight = null;
+  }
+}
+
+function render(data, query) {
+  grid.replaceChildren();
+  if (!data.results.length) {
+    status.textContent = `Nothing found for “${query}”. The catalog is small so far — try a broader description.`;
+    return;
+  }
+  status.textContent = `${data.count} result${data.count === 1 ? '' : 's'} for “${query}”`;
+
+  for (const item of data.results) {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'card';
+    card.onclick = () => openDetail(item.id);
+
+    const img = document.createElement('img');
+    img.src = item.thumbnail_url || item.image_url;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    // Titles are the only description many archival items have, so they carry
+    // the alt text rather than a generic placeholder.
+    img.alt = item.title || 'Untitled archive item';
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const title = document.createElement('div');
+    title.className = 't';
+    title.textContent = item.title || 'Untitled';
+    const licence = document.createElement('div');
+    licence.className = 'l';
+    licence.innerHTML = `<span class="badge">${escapeHtml(item.license.id)}</span>`;
+    meta.append(title, licence);
+    card.append(img, meta);
+    grid.append(card);
+  }
+}
+
+async function openDetail(id) {
+  dialog.showModal();
+  $('detailBody').innerHTML = `<div class="info"><p class="by">Loading…</p></div>`;
+  try {
+    const item = await (await fetch(`/api/item/${id}`)).json();
+    const requiresCredit = item.license.requires_attribution;
+    $('detailBody').innerHTML = `
+      <div class="detail">
+        <img src="${escapeAttr(item.image_url)}" alt="${escapeAttr(item.title || 'Archive item')}">
+        <div class="info">
+          <h2>${escapeHtml(item.title || 'Untitled')}</h2>
+          <p class="by">${item.creator ? escapeHtml(item.creator) : 'Creator unrecorded'}</p>
+
+          <div class="actions">
+            <a class="primary" href="/api/item/${item.id}/download">Download</a>
+            <a class="secondary" href="${escapeAttr(item.source_url)}" target="_blank" rel="noopener">
+              View at source ↗
+            </a>
+          </div>
+
+          <p class="licence-note">${escapeHtml(item.license.statement)}</p>
+
+          <dl>
+            <dt>Licence</dt><dd>${escapeHtml(item.license.id)}</dd>
+            <dt>Credit required</dt>
+            <dd>${requiresCredit ? escapeHtml(item.attribution || 'Yes — see source') : 'No — no conditions on reuse'}</dd>
+            <dt>Source</dt><dd>${escapeHtml(item.source)}</dd>
+            ${item.width ? `<dt>Dimensions</dt><dd>${item.width} × ${item.height}</dd>` : ''}
+          </dl>
+
+          <p class="licence-note">
+            The file served here is web-resolution. For the original, follow
+            “View at source”.
+          </p>
+        </div>
+      </div>`;
+  } catch {
+    $('detailBody').innerHTML = `<div class="info"><p class="by">Could not load this item.</p></div>`;
+  }
+}
+
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g,
+  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const escapeAttr = escapeHtml;
+
+// Land on real content rather than an empty page.
+search(EXAMPLES[Math.floor(Math.random() * EXAMPLES.length)]);
+</script>
+</body>
+</html>
