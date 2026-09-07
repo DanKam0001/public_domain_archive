@@ -35,11 +35,23 @@ tiers:
 
 licenses:
 
+# Matching is EXACT, never fuzzy. Each licence lists the identifiers it accepts
+# (`match_ids`), the URL fragments that identify it (`match_urls`), and the
+# free-text phrases that do (`match_tokens`). There is no prefix or
+# substring-of-identifier fallback: an earlier version of the gate mapped the
+# generic token "pd" onto PDM-1.0 by prefix, which recorded a specific licence
+# the source had never claimed. Guessing which licence a source meant is exactly
+# the interpretation the gate exists to avoid.
+#
+# `match_tokens` is the weakest signal and is deliberately empty for licences
+# whose names appear in ordinary prose (a caption reading "not in the public
+# domain" must never match a licence).
+
   - id: CC0-1.0
     tier: public_domain
     name: Creative Commons Zero v1.0 Universal
     url: https://creativecommons.org/publicdomain/zero/1.0/
-    # Matched case-insensitively against the source's raw licence string/URL.
+    match_ids: ["cc0", "cc0-1.0", "cc-0"]
     match_urls:
       - creativecommons.org/publicdomain/zero/1.0
     match_tokens: ["cc0", "cc-0", "cc zero"]
@@ -48,9 +60,29 @@ licenses:
     tier: public_domain
     name: Public Domain Mark 1.0
     url: https://creativecommons.org/publicdomain/mark/1.0/
+    # NOTE: "pdm" only. Bare "pd" is NOT this licence — see PD-GENERIC below.
+    match_ids: ["pdm", "pdm-1.0"]
     match_urls:
       - creativecommons.org/publicdomain/mark/1.0
     match_tokens: ["pdm", "public domain mark"]
+
+  - id: PD-GENERIC
+    tier: public_domain
+    name: Public domain (no specific instrument asserted)
+    url: https://en.wikipedia.org/wiki/Public_domain
+    # For sources that assert public domain status *structurally* without naming
+    # a Creative Commons instrument — e.g. Wikimedia Commons' `License: pd`,
+    # which covers works PD by expiry, by lack of notice, or by statute. This is
+    # a large and legitimate share of genuinely free material, and mapping it
+    # onto PDM-1.0 to avoid a new entry would be recording a false claim.
+    #
+    # Deliberately has NO match_tokens and NO match_urls: it is admissible only
+    # from a source's STRUCTURED licence field, never from free text, because
+    # the phrase "public domain" appears constantly in ordinary prose —
+    # including in sentences denying that something is public domain.
+    match_ids: ["pd", "publicdomain", "public-domain", "pd-us", "pd-old"]
+    match_urls: []
+    match_tokens: []
 
   - id: US-GOV
     tier: public_domain
@@ -61,6 +93,7 @@ licenses:
     # NOT valid for third-party or contractor material that a federal agency
     # merely republished. Sources may only assert this via `explicit_license_id`
     # when the source itself makes that authorship claim per item.
+    match_ids: ["us-gov", "usgov"]
     match_urls:
       - usa.gov/government-works
     match_tokens: []
@@ -70,6 +103,7 @@ licenses:
     tier: attribution
     name: Creative Commons Attribution 4.0
     url: https://creativecommons.org/licenses/by/4.0/
+    match_ids: ["cc-by-4.0", "by-4.0"]
     match_urls: ["creativecommons.org/licenses/by/4.0"]
     match_tokens: ["cc by 4.0", "cc-by-4.0"]
 
@@ -77,6 +111,7 @@ licenses:
     tier: attribution
     name: Creative Commons Attribution 3.0
     url: https://creativecommons.org/licenses/by/3.0/
+    match_ids: ["cc-by-3.0", "by-3.0"]
     match_urls: ["creativecommons.org/licenses/by/3.0"]
     match_tokens: ["cc by 3.0", "cc-by-3.0"]
 
@@ -84,6 +119,7 @@ licenses:
     tier: attribution
     name: Creative Commons Attribution 2.0
     url: https://creativecommons.org/licenses/by/2.0/
+    match_ids: ["cc-by-2.0", "by-2.0"]
     match_urls: ["creativecommons.org/licenses/by/2.0"]
     match_tokens: ["cc by 2.0", "cc-by-2.0"]
 

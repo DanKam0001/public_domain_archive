@@ -215,3 +215,61 @@ def test_gate_cannot_be_tricked_by_a_source_inventing_a_licence(gate):
     """A source adapter cannot widen the allowlist by asserting an id."""
     d = gate.evaluate(explicit_license_id="TOTALLY-FREE-1.0")
     assert d.allowed is False
+
+
+# ---------------------------------------------------------------------------
+# Regression: identifier matching must be exact, never fuzzy.
+#
+# Found by pointing the live Wikimedia harvester at Category:CC-BY-NC-4.0. A
+# 1967 newspaper scan (File:Chicago_Seed_September_1967_issue.pdf) was admitted
+# as PDM-1.0 on the strength of its structured field `License: pd`, because the
+# old prefix matcher saw that "pdm10" starts with "pd".
+#
+# The item really was public domain — PD-US-no-notice — so the *verdict* was
+# right. The mechanism was not: we would have written a licence identifier the
+# source never claimed. These tests pin the distinction.
+# ---------------------------------------------------------------------------
+
+def test_bare_pd_is_not_the_public_domain_mark(gate):
+    """The original bug. 'pd' is a generic status, PDM-1.0 is a specific
+    instrument published by Creative Commons. Conflating them records a false
+    claim even when the item is genuinely free."""
+    d = gate.evaluate(explicit_license_id="pd")
+    assert d.license_id != "PDM-1.0"
+
+
+def test_bare_pd_maps_to_the_generic_public_domain_entry(gate):
+    """Real case: Wikimedia's structured `License: pd`. Admitted — but recorded
+    accurately, as a public domain assertion with no named instrument."""
+    d = gate.evaluate(explicit_license_id="pd", license_text="Public domain")
+    assert d.allowed is True
+    assert d.license_id == "PD-GENERIC"
+    assert d.license.requires_attribution is False
+
+
+def test_identifier_prefixes_do_not_match(gate):
+    """No prefix fallback in any direction.
+
+    Note these are true prefixes, not punctuation variants: "cc0-" normalises to
+    "cc0" and legitimately matches the CC0 alias, which is normalisation working
+    as intended rather than the fuzzy matching this test guards against.
+    """
+    for value in ("c", "cc", "p", "pdm-1", "cc0-1"):
+        assert gate.evaluate(explicit_license_id=value).license_id is None, value
+
+
+def test_generic_public_domain_not_matchable_from_free_text(gate):
+    """PD-GENERIC is admissible only from a structured licence field.
+
+    The phrase appears constantly in ordinary prose — including in sentences
+    saying something is *not* public domain, which must never admit an item.
+    """
+    assert gate.evaluate(license_text="This work is in the public domain").allowed is False
+    assert gate.evaluate(license_text="This photo is not in the public domain").allowed is False
+
+
+def test_openverse_bare_ids_still_work(gate):
+    """The aliases the live sources actually send, pinned so a future edit to
+    licenses.yaml that drops one fails loudly."""
+    assert gate.evaluate(explicit_license_id="cc0").license_id == "CC0-1.0"
+    assert gate.evaluate(explicit_license_id="pdm").license_id == "PDM-1.0"

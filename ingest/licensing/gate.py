@@ -59,6 +59,7 @@ class License:
     tier: str
     name: str
     url: str
+    match_ids: tuple[str, ...] = ()
     match_urls: tuple[str, ...] = ()
     match_tokens: tuple[str, ...] = ()
     jurisdiction: str | None = None
@@ -178,14 +179,28 @@ class LicenseGate:
     # -- internals ----------------------------------------------------------
 
     def _by_id(self, value: str) -> License | None:
+        """Exact identifier match only — against the licence's own id or its
+        declared aliases in ``match_ids``.
+
+        There is deliberately no prefix or substring fallback. A previous
+        version accepted the shortest unambiguous prefix, which silently mapped
+        Wikimedia's generic ``pd`` ("public domain", by expiry/notice/statute)
+        onto the specific ``PDM-1.0`` instrument, because "pdm10" happens to
+        start with "pd". The item was genuinely public domain, so the verdict
+        looked fine — but we would have recorded a licence the source never
+        claimed. Sources that use a bare identifier must have it listed in
+        ``match_ids`` explicitly, which makes the mapping reviewable in a diff
+        rather than emergent from string arithmetic.
+        """
         want = _normalise(value)
+        if not want:
+            return None
         for lic in self._licenses:
             if _normalise(lic.id) == want:
                 return lic
-        # Openverse reports e.g. license="cc0", license_version="1.0"; accept the
-        # bare form only when it is unambiguous across the allowlist.
-        matches = [lic for lic in self._licenses if _normalise(lic.id).startswith(want)]
-        return matches[0] if len(matches) == 1 else None
+            if any(_normalise(alias) == want for alias in lic.match_ids):
+                return lic
+        return None
 
     def _by_url(self, value: str) -> License | None:
         v = value.lower().rstrip("/")
@@ -230,6 +245,7 @@ def _load_registry(path: Path) -> tuple[tuple[License, ...], tuple[tuple[str, st
                 tier=tier,
                 name=entry["name"],
                 url=entry["url"],
+                match_ids=tuple(entry.get("match_ids") or ()),
                 match_urls=tuple(entry.get("match_urls") or ()),
                 match_tokens=tuple(entry.get("match_tokens") or ()),
                 jurisdiction=entry.get("jurisdiction"),

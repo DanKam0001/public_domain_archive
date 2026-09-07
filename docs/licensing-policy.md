@@ -60,7 +60,16 @@ measured to be false.
 |---|---|
 | **CC0 1.0** | Explicit dedication to the public domain |
 | **Public Domain Mark 1.0** | Asserts no known copyright |
+| **PD-GENERIC** | A source's *structured* assertion of public domain status without naming a specific instrument — e.g. Wikimedia's `License: pd`, covering works PD by expiry, by lack of copyright notice, or by statute. Admissible only from a structured licence field, **never** from free text, because "public domain" appears constantly in prose including in sentences denying it |
 | **US federal works** (17 U.S.C. §105) | Only where the source asserts federal authorship per item. **Not** valid for contractor or third-party material an agency merely republished — a common and dangerous confusion |
+
+We record the licence the source actually claimed, never a near-neighbour. A
+generic public domain assertion is stored as `PD-GENERIC`, not silently upgraded
+to `PDM-1.0` — the two are different claims, and the catalog should not invent
+precision the source did not provide. Identifier matching is exact for the same
+reason: an early version of the gate mapped `pd` onto `PDM-1.0` by prefix, and
+though that item turned out to be genuinely public domain, the record would have
+been false. See `tests/test_license_gate.py` for the pinned regression.
 
 ### Allowlisted but opt-in — `attribution` tier
 
