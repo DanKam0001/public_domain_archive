@@ -55,9 +55,20 @@ export default async function handler(req, res) {
     let variants = [];
 
     if (expand && expansionAvailable()) {
-      variants = await expandQuery(query);
-      if (variants.length) {
-        rows = await searchExpanded({ query, embedding, variants, limit, tier });
+      // Expansion is the only operation here that spends real money per call,
+      // on a public unauthenticated endpoint. The ordinary 60/min search limit
+      // would permit ~$430/day of model spend from one IP. This bucket is
+      // separate and far tighter, and a caller who exceeds it still gets
+      // results — just unexpanded — because degrading is better than failing.
+      //
+      // The proper fix is to gate expansion behind an issued API key once key
+      // issuance exists; this bounds the exposure until then.
+      const budget = await rateLimit(req, { limit: 10, window: 3600 });
+      if (budget.ok) {
+        variants = await expandQuery(query);
+        if (variants.length) {
+          rows = await searchExpanded({ query, embedding, variants, limit, tier });
+        }
       }
     }
 
