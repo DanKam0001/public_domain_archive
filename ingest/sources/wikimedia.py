@@ -36,10 +36,26 @@ from .base import RawItem, Source, _int_or_none
 
 API = "https://commons.wikimedia.org/w/api.php"
 
-#: Categories to walk. Both are unambiguous dedications rather than licences
-#: with conditions, which is what Phase 1 wants.
+#: Categories to walk. All are unambiguous dedications rather than licences with
+#: conditions, which is what the public_domain tier wants.
+#:
+#: Measured file counts (via the categoryinfo API), because the intuitive
+#: category is not the big one:
+#:
+#:     Category:CC-PD-Mark      16,918,823 files
+#:     Category:CC-Zero          9,793,747 files
+#:     Category:Public_domain       13,939 files
+#:
+#: `Category:Public_domain` reads like it should be the main pool and is
+#: essentially empty — it is a container for sub-categories, not a home for
+#: files. `CC-PD-Mark` is the largest single source of licence-clean images
+#: anywhere and was missing from this list; a 60-item sample admitted 100%.
+#:
+#: Combined addressable supply here is ~26M images, against a Phase 1 corpus of
+#: under a thousand. Supply is not the constraint on this project.
 DEFAULT_CATEGORIES = (
     "Category:CC-Zero",
+    "Category:CC-PD-Mark",
     "Category:Public_domain",
 )
 
