@@ -1,0 +1,44 @@
+# Private planning doc. References unrelated private infrastructure
+# (other projects' refs, local credential paths), so it stays local.
+# The public roadmap lives in README.md and docs/.
+PLAN.md
+
+# Secrets — never commit. See CONTRIBUTING.md.
+.env
+.env.*
+!.env.example
+master_env
+*.pem
+*.key
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+.next/
+.vercel/
+
+# Model weights and caches — large, and reproducible from the pinned model id
+.cache/
+models/
+*.onnx
+*.safetensors
+
+# Local ingest scratch
+data/
+downloads/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

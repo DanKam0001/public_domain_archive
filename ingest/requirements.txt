@@ -1,0 +1,22 @@
+# Ingestion runs locally, not in a serverless function, so it can afford real
+# ML dependencies. Nothing here is installed on Vercel.
+
+# Licence gate + config
+PyYAML>=6.0
+
+# Sources
+requests>=2.31
+
+# Embeddings — the image tower runs here; the text tower runs in the API.
+# Model id is pinned via EMBED_MODEL and asserted against the JS side by
+# tests/test_model_parity.py.
+torch>=2.2
+transformers>=4.40
+Pillow>=10.0
+
+# Storage
+boto3>=1.34          # R2 via the S3-compatible API
+psycopg[binary]>=3.1 # direct Postgres; vector search is raw SQL
+
+# Dev
+pytest>=8.0

@@ -1,0 +1,122 @@
+# Canonical licence allowlist for the ingestion gate.
+#
+# THIS FILE IS THE ALLOWLIST. If a licence is not described here, the gate
+# REJECTS the item. There is no fallback, no "probably fine", no inference from
+# which collection an item happened to sit in.
+#
+# Rationale (see docs/licensing-policy.md): this catalog's entire value is that a
+# caller — very often an automated pipeline with no human in the loop — does not
+# have to verify rights per item. If we admit something restrictive or unlabelled
+# and present it as cleared, we are the party vouching for a false claim. A script
+# calling auto_broll() cannot honour a promise not to monetise, so "the user said
+# they wouldn't" can never be part of the safety argument.
+#
+# ---------------------------------------------------------------------------
+# ADDING A LICENCE: this is a security-relevant change. A PR editing this file
+# needs an explanation of why the licence imposes no condition that an automated,
+# commercial, unattended consumer could unknowingly violate. Attribution is a
+# condition a machine CAN honour (we render it); ShareAlike, NonCommercial and
+# NoDerivatives are not.
+# ---------------------------------------------------------------------------
+
+tiers:
+  public_domain:
+    description: >-
+      No conditions on reuse of any kind. Safe for an unattended commercial
+      pipeline with zero downstream obligations.
+    requires_attribution: false
+
+  attribution:
+    description: >-
+      Free for commercial use and derivatives, but a credit line must be
+      reproduced. Machine-honourable: we pre-render the credit string at ingest
+      so a consumer can emit it without parsing anything.
+    requires_attribution: true
+
+licenses:
+
+  - id: CC0-1.0
+    tier: public_domain
+    name: Creative Commons Zero v1.0 Universal
+    url: https://creativecommons.org/publicdomain/zero/1.0/
+    # Matched case-insensitively against the source's raw licence string/URL.
+    match_urls:
+      - creativecommons.org/publicdomain/zero/1.0
+    match_tokens: ["cc0", "cc-0", "cc zero"]
+
+  - id: PDM-1.0
+    tier: public_domain
+    name: Public Domain Mark 1.0
+    url: https://creativecommons.org/publicdomain/mark/1.0/
+    match_urls:
+      - creativecommons.org/publicdomain/mark/1.0
+    match_tokens: ["pdm", "public domain mark"]
+
+  - id: US-GOV
+    tier: public_domain
+    name: U.S. Federal Government work (17 U.S.C. §105)
+    url: https://www.usa.gov/government-works
+    # NOTE: this is a JURISDICTIONAL basis, not a licence grant, and it is only
+    # valid for works authored by a federal employee in the course of duty. It is
+    # NOT valid for third-party or contractor material that a federal agency
+    # merely republished. Sources may only assert this via `explicit_license_id`
+    # when the source itself makes that authorship claim per item.
+    match_urls:
+      - usa.gov/government-works
+    match_tokens: []
+    jurisdiction: US
+
+  - id: CC-BY-4.0
+    tier: attribution
+    name: Creative Commons Attribution 4.0
+    url: https://creativecommons.org/licenses/by/4.0/
+    match_urls: ["creativecommons.org/licenses/by/4.0"]
+    match_tokens: ["cc by 4.0", "cc-by-4.0"]
+
+  - id: CC-BY-3.0
+    tier: attribution
+    name: Creative Commons Attribution 3.0
+    url: https://creativecommons.org/licenses/by/3.0/
+    match_urls: ["creativecommons.org/licenses/by/3.0"]
+    match_tokens: ["cc by 3.0", "cc-by-3.0"]
+
+  - id: CC-BY-2.0
+    tier: attribution
+    name: Creative Commons Attribution 2.0
+    url: https://creativecommons.org/licenses/by/2.0/
+    match_urls: ["creativecommons.org/licenses/by/2.0"]
+    match_tokens: ["cc by 2.0", "cc-by-2.0"]
+
+# ---------------------------------------------------------------------------
+# Explicitly denied. These exist ONLY to produce a precise rejection reason in
+# logs and tests. Removing an entry here does NOT admit the licence — the
+# allowlist above is what admits. This list is documentation and diagnostics.
+#
+# The NC entry is the one that motivated this whole design: sampling the
+# archive.org `nasa` collection found CC BY-NC 2.0 material sitting alongside
+# genuine public domain works, with nothing in the standard metadata fields to
+# distinguish them.
+# ---------------------------------------------------------------------------
+denied:
+  - pattern: "creativecommons.org/licenses/by-nc"
+    reason: "NonCommercial — our consumers monetise; serving this would hand them a violation"
+  - pattern: "creativecommons.org/licenses/by-nd"
+    reason: "NoDerivatives — cannot be cut, cropped, or edited into a video"
+  - pattern: "creativecommons.org/licenses/by-sa"
+    reason: "ShareAlike — imposes copyleft on the consumer's finished work"
+  - pattern: "creativecommons.org/licenses/by-nc-sa"
+    reason: "NonCommercial + ShareAlike"
+  - pattern: "creativecommons.org/licenses/by-nc-nd"
+    reason: "NonCommercial + NoDerivatives"
+  - pattern: "rightsstatements.org/vocab/InC"
+    reason: "In Copyright"
+  - pattern: "rightsstatements.org/vocab/CNE"
+    reason: "Copyright Not Evaluated — an explicit statement that nobody checked"
+  - pattern: "all rights reserved"
+    reason: "All rights reserved"
+  - pattern: "fair use"
+    reason: "Fair use is a defence, not a grant, and is not transferable to our consumers"
+  - pattern: "educational use only"
+    reason: "Use-restricted"
+  - pattern: "personal use only"
+    reason: "Use-restricted"
