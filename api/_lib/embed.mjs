@@ -11,10 +11,20 @@
  * `openai/clip-vit-base-patch32` weights the ingest pipeline pins.
  */
 
-import { AutoTokenizer, CLIPTextModelWithProjection } from '@huggingface/transformers';
+import { AutoTokenizer, CLIPTextModelWithProjection, env } from '@huggingface/transformers';
 
 export const MODEL_ID = 'Xenova/clip-vit-base-patch32';
 export const EMBED_DIM = 512;
+
+// Transformers.js defaults to caching model files inside node_modules, which is
+// READ-ONLY on Vercel:
+//   ENOENT: mkdir '/var/task/node_modules/@huggingface/transformers/.cache'
+// /tmp is the only writable path in a serverless container. It persists for the
+// life of a warm container, so the model downloads once per cold start and is
+// reused by every subsequent request that container serves.
+env.cacheDir = '/tmp/.transformers-cache';
+// No browser present; the browser-cache path only produces noisy warnings here.
+env.useBrowserCache = false;
 
 // Loaded once per warm container. The first request pays 1-3s; every
 // subsequent one is ~30ms, which is why the search route also caches
