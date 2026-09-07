@@ -9,9 +9,25 @@ download, an API. The content is free; the convenience is not.
 This project removes that gap. Everything here is open source, self-hosted, and
 funded by donations.
 
-> **Status: Phase 1, in development.** Nothing is deployed yet. This README
-> describes what exists today, not an aspiration. The roadmap is at the bottom;
-> the reasoning behind the architecture is in [docs/](docs/).
+**Live: https://public-domain-archive.vercel.app**
+
+> **Status: Phase 1 complete.** 1,038 images ingested, search API and site live,
+> Python SDK working. This README describes what exists today, not an
+> aspiration. The roadmap is at the bottom; the reasoning behind the
+> architecture is in [docs/](docs/).
+
+```bash
+pip install -e sdk/python
+pda search "snow covered mountains" --download ./footage
+```
+
+```python
+from public_domain_archive import Client
+
+archive = Client()
+for item in archive.search("an antique map", limit=5):
+    print(item.title, item.license.id, item.source_url)
+```
 
 ---
 
@@ -103,8 +119,8 @@ asserts the Python and JavaScript sides agree to a cosine similarity > 0.999.
 | `ingest/` | Python pipeline: sources → licence gate → embeddings → storage |
 | `ingest/licensing/` | **The gate.** `licenses.yaml` is the allowlist; `gate.py` is the logic |
 | `api/` | Vercel serverless routes |
-| `web/` | Frontend |
-| `sdk/python/` | `pip`-installable client + CLI |
+| `public/` | Frontend (Vercel's static root) |
+| `sdk/python/` | `pip`-installable client + `pda` CLI |
 | `db/migrations/` | Postgres + pgvector schema |
 | `docs/` | Architecture, licensing policy, costs |
 

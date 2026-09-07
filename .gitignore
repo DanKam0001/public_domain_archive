@@ -45,3 +45,6 @@ Thumbs.db
 
 # Transformers.js model cache
 .cache/
+
+# SDK editable-install artifacts
+sdk/python/src/*.egg-info/

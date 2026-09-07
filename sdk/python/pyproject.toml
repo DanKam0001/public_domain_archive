@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "public-domain-archive"
+version = "0.1.0"
+description = "Search and download genuinely public domain media — every item licence-verified individually."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "AGPL-3.0-or-later"
+keywords = ["public domain", "stock media", "cc0", "creative commons", "image search"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Topic :: Multimedia :: Graphics",
+]
+
+# No runtime dependencies, deliberately. The client is stdlib-only (urllib,
+# json, pathlib), so dropping it into an existing pipeline cannot cause a
+# version conflict with whatever that pipeline already pins — which matters
+# because the target user is someone's automated media stack, not a fresh venv.
+dependencies = []
+
+[project.urls]
+Homepage = "https://public-domain-archive.vercel.app"
+Source = "https://github.com/DanKam0001/public_domain_archive"
+Issues = "https://github.com/DanKam0001/public_domain_archive/issues"
+
+[project.scripts]
+pda = "public_domain_archive.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/public_domain_archive"]
