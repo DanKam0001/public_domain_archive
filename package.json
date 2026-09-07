@@ -1,0 +1,12 @@
+{
+  "name": "public-domain-archive",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Free, open, programmable search over public domain media",
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "@huggingface/transformers": "^3.0.0",
+    "postgres": "^3.4.4"
+  }
+}

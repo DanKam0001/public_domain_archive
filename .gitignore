@@ -42,3 +42,6 @@ downloads/
 Thumbs.db
 .idea/
 .vscode/
+
+# Transformers.js model cache
+.cache/

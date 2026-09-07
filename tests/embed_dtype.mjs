@@ -1,0 +1,10 @@
+import { AutoTokenizer, CLIPTextModelWithProjection } from '@huggingface/transformers';
+const MODEL = 'Xenova/clip-vit-base-patch32';
+const dtype = process.argv[2];
+const texts = process.argv.slice(3);
+const tokenizer = await AutoTokenizer.from_pretrained(MODEL);
+const model = await CLIPTextModelWithProjection.from_pretrained(MODEL, { dtype });
+const inputs = await tokenizer(texts, { padding: true, truncation: true });
+const { text_embeds } = await model(inputs);
+const out = text_embeds.tolist().map(v => { const n = Math.hypot(...v); return v.map(x => x/n); });
+console.log(JSON.stringify({ vectors: out }));
