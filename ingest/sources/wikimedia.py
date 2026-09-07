@@ -42,6 +42,28 @@ DEFAULT_CATEGORIES = (
 
 BATCH = 200  # generous but polite; the API allows more for some users
 
+#: Width of the rendition we fetch, via the API's `iiurlwidth` parameter.
+#:
+#: We deliberately do NOT download originals. Measured on a real sample, Commons
+#: originals average ~2.7MB and reach 9MB+, which projects to ~1.9GB for a
+#: 700-item harvest — while CLIP resizes everything to 224px before looking at
+#: it. A 1280px rendition is ~20x smaller and changes retrieval quality not at
+#: all.
+#:
+#: PRODUCT TRADEOFF, not just an optimisation: it means the file we store and
+#: serve is web-resolution, and a user wanting the true original follows
+#: `source_url`. For Phase 1 that is clearly right — it makes ingestion minutes
+#: instead of hours and keeps storage tiny. If full-resolution download becomes
+#: part of the product's value, this is the line to revisit, and the cost lands
+#: in R2 storage rather than in egress.
+RENDITION_WIDTH = 1280
+
+#: Commons serves PDFs, DjVu, TIFF, SVG and video through the same image API.
+#: Filtering on the ORIGINAL mime here — before any download — is what keeps a
+#: book scan or a video from entering an image catalog.
+IMAGE_MIMES = {"image/jpeg", "image/png", "image/webp", "image/gif",
+               "image/tiff", "image/svg+xml"}
+
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
 
@@ -73,6 +95,9 @@ class WikimediaSource(Source):
                     "gcmlimit": min(BATCH, limit - yielded + 50),
                     "prop": "imageinfo",
                     "iiprop": "url|size|mime|extmetadata",
+                    # Ask for a scaled rendition alongside the original; the
+                    # response then carries `thumburl`. See RENDITION_WIDTH.
+                    "iiurlwidth": RENDITION_WIDTH,
                 }
                 if continue_token:
                     params["gcmcontinue"] = continue_token
@@ -115,7 +140,17 @@ class WikimediaSource(Source):
             self.skipped_restricted += 1
             return None
 
-        file_url = info.get("url")
+        # Filter on the ORIGINAL mime, before spending any bandwidth. Commons
+        # returns PDFs, DjVu, video and audio through this same endpoint, and
+        # their `thumburl` is a rendered JPEG page — which would quietly admit
+        # a scanned book into an image catalog.
+        original_mime = (info.get("mime") or "").lower()
+        if original_mime not in IMAGE_MIMES:
+            return None
+
+        # Prefer the scaled rendition; fall back to the original if the API
+        # declined to produce one (it does that for some formats).
+        file_url = info.get("thumburl") or info.get("url")
         landing = info.get("descriptionurl")
         if not file_url or not landing:
             return None
@@ -136,6 +171,13 @@ class WikimediaSource(Source):
             height=_int_or_none(info.get("height")),
             bytes=_int_or_none(info.get("size")),
             raw={"pageid": page.get("pageid"), "title": page.get("title"),
+                 # Keep a pointer to the true original even though we store a
+                 # rendition, so full resolution stays recoverable later.
+                 "original_url": info.get("url"),
+                 "original_mime": original_mime,
+                 "original_width": info.get("width"),
+                 "original_height": info.get("height"),
+                 "original_bytes": info.get("size"),
                  "extmetadata": meta},
         )
 

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import collections
 import dataclasses
-import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
 import requests
@@ -34,9 +34,9 @@ EXTENSION = {"image/jpeg": "jpg", "image/png": "png",
 
 MAX_BYTES = 25 * 1024 * 1024
 
-#: Pause between image downloads. Small, but it keeps a 1,000-item run from
-#: looking like a scrape to the CDN serving it.
-FETCH_DELAY = 0.15
+#: Concurrent image downloads. Deliberately modest: these archives are
+#: non-profits and we are a guest on their bandwidth.
+FETCH_WORKERS = 6
 
 
 @dataclasses.dataclass
@@ -67,7 +67,52 @@ def run(
     session = requests.Session()
     session.headers["User-Agent"] = source.session.headers["User-Agent"]
 
+    admitted_queue: list[tuple] = []
     pending: list[tuple] = []
+
+    def fetch_one(item):
+        """Download and decode one item. Returns None on any failure reason,
+        paired with a label so the caller can count it."""
+        try:
+            response = session.get(item.file_url, timeout=60, stream=True)
+            response.raise_for_status()
+            mime = (response.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            if mime not in ACCEPTED_MIME:
+                return None, f"unsupported type: {mime or 'unknown'}"
+            # Check the advertised size before pulling the body, so one
+            # pathological file cannot stall a run.
+            if int(response.headers.get("Content-Length") or 0) > MAX_BYTES:
+                return None, "oversize"
+            data = response.content
+            if len(data) > MAX_BYTES:
+                return None, "oversize"
+        except Exception as exc:
+            return None, f"fetch: {type(exc).__name__}"
+
+        image = load_image(data)
+        if image is None:
+            return None, "undecodable"
+        return (image, data, mime), None
+
+    def fetch_batch() -> None:
+        """Download a batch concurrently.
+
+        Downloads are pure network wait and were the dominant cost once the
+        database round trips were fixed. Concurrency is kept modest: these
+        archives are non-profits, and a handful of parallel requests to a CDN is
+        neighbourly where a hundred would not be.
+        """
+        if not admitted_queue:
+            return
+        with ThreadPoolExecutor(max_workers=FETCH_WORKERS) as pool:
+            results = list(pool.map(lambda pair: fetch_one(pair[0]), admitted_queue))
+        for (item, decision), (payload, failure) in zip(admitted_queue, results):
+            if payload is None:
+                stats.failed[failure] += 1
+                continue
+            image, data, mime = payload
+            pending.append((item, image, decision, data, mime))
+        admitted_queue.clear()
 
     def flush() -> None:
         """Embed and store one batch.
@@ -78,13 +123,16 @@ def run(
         if not pending:
             return
         vectors = embedder.embed_images([p[1] for p in pending])
+
+        uploads: list[tuple[str, bytes, str]] = []
+        rows: list[dict] = []
         for (item, image, decision, data, mime), vector in zip(pending, vectors):
             try:
-                ext = EXTENSION[mime]
-                full_key, thumb_key = object_keys(item.source, item.source_id, ext)
-                storage.put_image(full_key, data, mime)
-                storage.put_thumbnail(thumb_key, image)
-                storage.upsert(to_row(
+                full_key, thumb_key = object_keys(
+                    item.source, item.source_id, EXTENSION[mime])
+                uploads.append((full_key, data, mime))
+                uploads.append((thumb_key, storage.render_thumbnail(image), "image/jpeg"))
+                rows.append(to_row(
                     item, decision,
                     r2_key=full_key, thumb_key=thumb_key,
                     embedding=vector, embed_model=embedder.model_id,
@@ -94,9 +142,22 @@ def run(
                         decision.license, creator=item.creator,
                         title=item.title, source_url=item.source_url),
                 ))
-                stats.stored += 1
             except Exception as exc:
-                stats.failed[f"store: {type(exc).__name__}"] += 1
+                stats.failed[f"prepare: {type(exc).__name__}"] += 1
+
+        # Uploads first: a row must never point at an object that isn't there.
+        # If some uploads fail we still write the rest, and the failures are
+        # counted rather than silently dropped.
+        errors = storage.put_batch(uploads)
+        for exc in errors:
+            stats.failed[f"upload: {type(exc).__name__}"] += 1
+
+        try:
+            storage.upsert_many(rows)
+            stats.stored += len(rows)
+        except Exception as exc:
+            stats.failed[f"db: {type(exc).__name__}"] += 1
+
         pending.clear()
 
     for item in source.harvest(limit):
@@ -118,37 +179,16 @@ def run(
         if dry_run:
             continue
 
-        # 2. Fetch. The adapter rate-limits its own API calls, but image bytes
-        #    come from a different host (a CDN or upload server), so it pauses
-        #    here too. These archives run on donations; we are a guest.
-        try:
-            time.sleep(FETCH_DELAY)
-            response = session.get(item.file_url, timeout=60, stream=True)
-            response.raise_for_status()
-            mime = (response.headers.get("Content-Type") or "").split(";")[0].strip().lower()
-            if mime not in ACCEPTED_MIME:
-                stats.failed[f"unsupported type: {mime or 'unknown'}"] += 1
-                continue
-            data = response.content
-            if len(data) > MAX_BYTES:
-                stats.failed["oversize"] += 1
-                continue
-        except Exception as exc:
-            stats.failed[f"fetch: {type(exc).__name__}"] += 1
-            continue
-
-        # 3. Decode.
-        image = load_image(data)
-        if image is None:
-            stats.failed["undecodable"] += 1
-            continue
-
-        pending.append((item, image, decision, data, mime))
-        if len(pending) >= batch_size:
+        admitted_queue.append((item, decision))
+        if len(admitted_queue) >= batch_size:
+            fetch_batch()
             flush()
             log(f"  stored {stats.stored} / admitted {stats.admitted} ...")
 
+    fetch_batch()
     flush()
+    if storage is not None:
+        storage.close()
     return stats
 
 
