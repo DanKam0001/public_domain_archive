@@ -66,6 +66,24 @@ licenses:
       - creativecommons.org/publicdomain/mark/1.0
     match_tokens: ["pdm", "public domain mark"]
 
+  - id: CC-PDD
+    tier: public_domain
+    name: Creative Commons Public Domain Dedication and Certification (retired)
+    url: https://creativecommons.org/licenses/publicdomain/
+    # CC's pre-CC0 public domain dedication. Retired in 2009 and superseded by
+    # CC0, but still in wide use on older archive.org uploads — measured on 12%
+    # of a Prelinger Archives sample, where it was the ONLY licence signal
+    # present. Without this entry those items are rejected for carrying an
+    # unrecognised licence, which is the gate working correctly on an allowlist
+    # that was simply missing a real dedication.
+    #
+    # Distinct id rather than folding into PDM-1.0 or CC0-1.0: it is a
+    # different instrument, and the catalog records what the source claimed.
+    match_ids: ["cc-pdd", "publicdomain"]
+    match_urls:
+      - creativecommons.org/licenses/publicdomain
+    match_tokens: []
+
   - id: PD-GENERIC
     tier: public_domain
     name: Public domain (no specific instrument asserted)

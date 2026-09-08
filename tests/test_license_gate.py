@@ -273,3 +273,33 @@ def test_openverse_bare_ids_still_work(gate):
     licenses.yaml that drops one fails loudly."""
     assert gate.evaluate(explicit_license_id="cc0").license_id == "CC0-1.0"
     assert gate.evaluate(explicit_license_id="pdm").license_id == "PDM-1.0"
+
+
+# ---------------------------------------------------------------------------
+# Legacy CC public domain dedication (pre-CC0, retired 2009).
+#
+# Found while assessing Phase 2 video supply: 12% of a Prelinger Archives
+# sample carried this URL as their ONLY licence signal, and the gate rejected
+# them for an unrecognised licence. The allowlist was missing a real dedication.
+# ---------------------------------------------------------------------------
+
+def test_legacy_cc_public_domain_dedication_admitted(gate):
+    d = gate.evaluate(license_url="http://creativecommons.org/licenses/publicdomain/")
+    assert d.allowed is True
+    assert d.license_id == "CC-PDD"
+
+
+def test_legacy_dedication_is_not_confused_with_cc0_or_pdm(gate):
+    """A distinct instrument gets a distinct id — the catalog records what the
+    source actually claimed, not the nearest modern equivalent."""
+    d = gate.evaluate(license_url="http://creativecommons.org/licenses/publicdomain/")
+    assert d.license_id not in {"CC0-1.0", "PDM-1.0"}
+
+
+def test_legacy_dedication_url_does_not_admit_restrictive_neighbours(gate):
+    """`creativecommons.org/licenses/...` is the prefix shared with every
+    restrictive CC licence, so the new entry must not widen the door."""
+    for url in ("http://creativecommons.org/licenses/by-nc/2.0/",
+                "http://creativecommons.org/licenses/by-sa/4.0/",
+                "http://creativecommons.org/licenses/by-nc-nd/3.0/"):
+        assert gate.evaluate(license_url=url).allowed is False
