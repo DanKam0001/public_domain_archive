@@ -141,13 +141,31 @@ class Storage:
             self._conn = psycopg.connect(self.dsn, connect_timeout=30)
         return self._conn
 
-    def upsert_many(self, rows: list[dict]) -> None:
-        """One transaction, one round trip, for the whole batch."""
+    def upsert_many(self, rows: list[dict], _retry: bool = True) -> None:
+        """One transaction, one round trip, for the whole batch.
+
+        Reconnects once on a dropped connection. A multi-hour ingest outlives
+        server-side idle timeouts and pooler recycling, and a connection can be
+        broken without being `closed` — which the lazy accessor cannot detect.
+        Observed for real: one `db: OperationalError` in a 7,000-item run cost
+        that entire batch of 48 items.
+        """
         if not rows:
             return
-        with self.conn.cursor() as cur:
-            cur.executemany(_UPSERT_SQL, rows)
-        self.conn.commit()
+        try:
+            with self.conn.cursor() as cur:
+                cur.executemany(_UPSERT_SQL, rows)
+            self.conn.commit()
+        except psycopg.OperationalError:
+            if not _retry:
+                raise
+            try:
+                if self._conn is not None:
+                    self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
+            self.upsert_many(rows, _retry=False)
 
     def count(self) -> int:
         with self.conn.cursor() as cur:

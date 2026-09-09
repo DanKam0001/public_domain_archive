@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import collections
 import dataclasses
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
@@ -37,6 +38,10 @@ MAX_BYTES = 25 * 1024 * 1024
 #: Concurrent image downloads. Deliberately modest: these archives are
 #: non-profits and we are a guest on their bandwidth.
 FETCH_WORKERS = 6
+
+#: Retries per image download. Sustained runs get throttled upstream; see
+#: fetch_one().
+FETCH_RETRIES = 3
 
 
 @dataclasses.dataclass
@@ -70,11 +75,22 @@ def run(
     admitted_queue: list[tuple] = []
     pending: list[tuple] = []
 
-    def fetch_one(item):
+    def fetch_one(item, attempt: int = 0):
         """Download and decode one item. Returns None on any failure reason,
-        paired with a label so the caller can count it."""
+        paired with a label so the caller can count it.
+
+        Retries transient failures. Measured on a sustained 2-hour run: ~10% of
+        fetches failed with HTTPError, while a fresh 40-item sample immediately
+        afterwards returned 40/40 HTTP 200 — so the losses were upstream
+        throttling under sustained load, not bad URLs. Without a retry those
+        items are silently dropped from the harvest, which looks identical to
+        the source simply not having them.
+        """
         try:
             response = session.get(item.file_url, timeout=60, stream=True)
+            if response.status_code in (429, 500, 502, 503, 504) and attempt < FETCH_RETRIES:
+                time.sleep(min(float(response.headers.get("Retry-After") or 2 ** attempt), 30))
+                return fetch_one(item, attempt + 1)
             response.raise_for_status()
             mime = (response.headers.get("Content-Type") or "").split(";")[0].strip().lower()
             if mime not in ACCEPTED_MIME:
@@ -87,6 +103,9 @@ def run(
             if len(data) > MAX_BYTES:
                 return None, "oversize"
         except Exception as exc:
+            if attempt < FETCH_RETRIES:
+                time.sleep(2 ** attempt)
+                return fetch_one(item, attempt + 1)
             return None, f"fetch: {type(exc).__name__}"
 
         image = load_image(data)
